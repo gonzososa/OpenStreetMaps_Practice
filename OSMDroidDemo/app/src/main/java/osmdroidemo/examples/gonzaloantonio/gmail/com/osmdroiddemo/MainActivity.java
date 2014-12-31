@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.location.LocationProvider;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.view.Menu;
@@ -33,7 +34,6 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
         super.onCreate(savedInstanceState);
         resourceProxy = new DefaultResourceProxyImpl (getApplicationContext ());
         setContentView(R.layout.activity_main);
-
 
         mapView = (MapView) findViewById (R.id.mapView);
         mapView.setTileSource (TileSourceFactory.MAPQUESTOSM);
@@ -105,6 +105,13 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
             return;
         }
 
+
+        Location location = locationManager.getLastKnownLocation (LocationManager.GPS_PROVIDER);
+        if (location != null) {
+            setupLocation (location);
+            return;
+        }
+
         if (isGPSEnabled) {
             locationManager.requestLocationUpdates (LocationManager.GPS_PROVIDER,
                     5000, 10, this);
@@ -113,23 +120,8 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
 
     @Override
     public void onLocationChanged (Location location) {
-        Toast.makeText (this,
-                "Location changed: Lat " + location.getLatitude () +
-                " Log " + location.getLongitude (),
-                Toast.LENGTH_LONG).show ();
-
-        mapView.getController().setCenter (new GeoPoint (location));
-        mapView.getController().setZoom(15);
-
-        /*if (mapView.getOverlays().size() > 1)
-            mapView.getOverlays().remove (1);
-
-        OverlayItem item = new OverlayItem ("Here", "Here", new GeoPoint (location));
-
-        ArrayList<OverlayItem> overlayItemsArray = new ArrayList<>();
-        overlayItemsArray.add (item);
-
-        mapView.getOverlays().add (new ItemizedOverlayWithFocus<>(this, overlayItemsArray, null));*/
+        setupLocation (location);
+        locationManager.removeUpdates (this);
     }
 
     @Override
@@ -146,7 +138,6 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
     public void onStatusChanged (String provider, int status, Bundle extras) {
 
     }
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -165,4 +156,23 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
         return super.onOptionsItemSelected(item);
     }
 
+    private void setupLocation (Location location) {
+        Toast.makeText (this,
+                "Location changed: Lat " + location.getLatitude () +
+                        " Log " + location.getLongitude (),
+                Toast.LENGTH_LONG).show ();
+
+        mapView.getController().setCenter (new GeoPoint (location));
+        mapView.getController().setZoom (15);
+
+        if (mapView.getOverlays().size() > 1)
+            mapView.getOverlays().remove (1);
+
+        OverlayItem item = new OverlayItem ("Here", "Here", new GeoPoint (location));
+
+        ArrayList<OverlayItem> overlayItemsArray = new ArrayList<>();
+        overlayItemsArray.add (item);
+
+        mapView.getOverlays().add (new ItemizedOverlayWithFocus<>(this, overlayItemsArray, null));
+    }
 }
