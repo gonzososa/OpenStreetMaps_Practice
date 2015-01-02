@@ -6,16 +6,17 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
-import android.widget.ZoomButtonsController;
 
 import org.osmdroid.DefaultResourceProxyImpl;
 import org.osmdroid.ResourceProxy;
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
 import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapController;
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.ItemizedOverlayWithFocus;
 import org.osmdroid.views.overlay.MinimapOverlay;
@@ -27,6 +28,7 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
     LocationManager locationManager =  null;
     ResourceProxy resourceProxy;
     MapView mapView;
+    String provider;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,11 +37,11 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
         setContentView (R.layout.activity_main);
 
         mapView = (MapView) findViewById (R.id.mapView);
-        mapView.setTileSource (TileSourceFactory.MAPQUESTOSM);
+        mapView.setTileSource (TileSourceFactory.MAPNIK);
         mapView.setBuiltInZoomControls (true);
         mapView.setMultiTouchControls (true);
-        mapView.getController().setZoom (4);
-        mapView.getController().setCenter (new GeoPoint (19240000, -99120000));
+        mapView.getController().setZoom (16);
+        mapView.getController().setCenter (new GeoPoint (19.4326, -99.1332));
 
         MinimapOverlay minimapOverlay = new MinimapOverlay (this, mapView.getTileRequestCompleteHandler ());
         minimapOverlay.setZoomDifference (5);
@@ -60,9 +62,9 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
 
     @Override
     public void onResume () {
-        if (locationManager != null) {
+        if (locationManager != null && !provider.equals ("")) {
             locationManager.requestLocationUpdates (
-                    LocationManager.GPS_PROVIDER,
+                    provider,
                     5000,
                     10,
                     this);
@@ -82,7 +84,7 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
         getLocation();
     }
 
-    /*private void alertBox (String title, String message) {
+    private void alertBox (String title, String message) {
         AlertDialog.Builder builder = new AlertDialog.Builder (this);
         builder.setMessage (message)
                 .setCancelable (false)
@@ -92,7 +94,7 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
 
         AlertDialog alertDialog = builder.create ();
         alertDialog.show();
-    }*/
+    }
 
     private void getLocation () {
         locationManager = (LocationManager) getSystemService (LOCATION_SERVICE);
@@ -100,26 +102,25 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
         boolean isNetworkEnabled = locationManager.isProviderEnabled (LocationManager.NETWORK_PROVIDER);
 
         if (!isGPSEnabled && !isNetworkEnabled) {
-            //alertBox ("Location is disabled", "Please enabled it and try again!");
+            alertBox ("Location is disabled", "Please enabled it and try again!");
             return;
         }
 
 
-        Location location = locationManager.getLastKnownLocation (LocationManager.GPS_PROVIDER);
+        provider = isNetworkEnabled ? LocationManager.NETWORK_PROVIDER : LocationManager.GPS_PROVIDER;
+
+        Location location = locationManager.getLastKnownLocation (provider);
         if (location != null) {
-            setupLocation (location);
+            settingUpLocation (location);
             return;
         }
 
-        if (isGPSEnabled) {
-            locationManager.requestLocationUpdates (LocationManager.GPS_PROVIDER,
-                    5000, 10, this);
-        }
+        locationManager.requestLocationUpdates (provider, 5000, 10, this);
     }
 
     @Override
     public void onLocationChanged (Location location) {
-        setupLocation (location);
+        settingUpLocation(location);
         locationManager.removeUpdates (this);
     }
 
@@ -156,14 +157,12 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
         return super.onOptionsItemSelected(item);
     }
 
-    private void setupLocation (Location location) {
-        Toast.makeText (this,
-                "Location changed: Lat " + location.getLatitude () +
-                        " Log " + location.getLongitude (),
-                Toast.LENGTH_LONG).show ();
+    private void settingUpLocation (Location location) {
+        Toast.makeText (this, "Location changed: Lat " + location.getLatitude () +
+                        " Log " + location.getLongitude (), Toast.LENGTH_LONG).show();
 
-        mapView.getController().setCenter (new GeoPoint (location));
-        mapView.getController().setZoom (15);
+        mapView.getController().setCenter(new GeoPoint(location));
+        mapView.getController().setZoom (16);
 
         if (mapView.getOverlays().size() > 1)
             mapView.getOverlays().remove (1);
