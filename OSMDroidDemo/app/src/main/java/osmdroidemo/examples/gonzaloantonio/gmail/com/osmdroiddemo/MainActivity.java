@@ -6,7 +6,6 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -16,7 +15,6 @@ import org.osmdroid.DefaultResourceProxyImpl;
 import org.osmdroid.ResourceProxy;
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
 import org.osmdroid.util.GeoPoint;
-import org.osmdroid.views.MapController;
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.ItemizedOverlayWithFocus;
 import org.osmdroid.views.overlay.MinimapOverlay;
@@ -26,6 +24,7 @@ import java.util.ArrayList;
 
 public class MainActivity extends ActionBarActivity implements LocationListener {
     LocationManager locationManager =  null;
+    Location currentlocation;
     ResourceProxy resourceProxy;
     MapView mapView;
     String provider;
@@ -40,7 +39,7 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
         mapView.setTileSource (TileSourceFactory.MAPNIK);
         mapView.setBuiltInZoomControls (true);
         mapView.setMultiTouchControls (true);
-        mapView.getController().setZoom (16);
+        mapView.getController().setZoom (14);
         mapView.getController().setCenter (new GeoPoint (19.4326, -99.1332));
 
         MinimapOverlay minimapOverlay = new MinimapOverlay (this, mapView.getTileRequestCompleteHandler ());
@@ -109,11 +108,11 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
 
         provider = isNetworkEnabled ? LocationManager.NETWORK_PROVIDER : LocationManager.GPS_PROVIDER;
 
-        Location location = locationManager.getLastKnownLocation (provider);
-        if (location != null) {
-            settingUpLocation (location);
-            return;
-        }
+        currentlocation = locationManager.getLastKnownLocation (provider);
+//        if (location != null) {
+//            settingUpLocation (location);
+//            return;
+//        }
 
         locationManager.requestLocationUpdates (provider, 5000, 10, this);
     }
@@ -121,7 +120,7 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
     @Override
     public void onLocationChanged (Location location) {
         settingUpLocation(location);
-        locationManager.removeUpdates (this);
+        //locationManager.removeUpdates (this);
     }
 
     @Override
@@ -161,7 +160,9 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
         Toast.makeText (this, "Location changed: Lat " + location.getLatitude () +
                         " Log " + location.getLongitude (), Toast.LENGTH_LONG).show();
 
-        mapView.getController().setCenter(new GeoPoint(location));
+        if (!isBetterLocation (location, currentlocation)) return;
+
+        mapView.getController().setCenter (new GeoPoint (location));
         mapView.getController().setZoom (16);
 
         if (mapView.getOverlays().size() > 1)
@@ -173,5 +174,51 @@ public class MainActivity extends ActionBarActivity implements LocationListener 
         overlayItemsArray.add (item);
 
         mapView.getOverlays().add (new ItemizedOverlayWithFocus<>(this, overlayItemsArray, null));
+        currentlocation = location;
+    }
+
+    private static final int TWO_MINUTES = 1000 * 60 * 1;
+
+    private boolean isBetterLocation (Location location, Location currentBestLocation)
+    {
+        if (currentBestLocation == null) {
+            return true;
+        }
+
+        long timeDelta = location.getTime () - currentBestLocation.getTime ();
+        boolean isSignificantlyNewer = timeDelta > TWO_MINUTES;
+        boolean isSignificantlyOlder = timeDelta < -TWO_MINUTES;
+        boolean isNewer = timeDelta > 0;
+
+        if (isSignificantlyNewer) {
+            return true;
+        } else if (isSignificantlyOlder) {
+            return false;
+        }
+
+        int accuracyDelta = (int) (location.getAccuracy () - currentBestLocation.getAccuracy ());
+        boolean isLessAccurate = accuracyDelta > 0;
+        boolean isMoreAccurate = accuracyDelta < 0;
+        boolean isSignificantlyLessAccurate = accuracyDelta > 200;
+
+        boolean isFromSameProvider = isSameProvider (location.getProvider (), currentBestLocation.getProvider ());
+
+        if (isMoreAccurate) {
+            return true;
+        } else if (isNewer && !isLessAccurate) {
+            return true;
+        } else if (isNewer && isSignificantlyLessAccurate && isFromSameProvider) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private boolean isSameProvider (String provider1, String provider2) {
+        if (provider1 == null) {
+            return provider2 == null;
+        }
+
+        return provider1.equals (provider2);
     }
 }
